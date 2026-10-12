@@ -426,6 +426,9 @@ export const SlideCard: React.FC<SlideCardProps> = ({
                     <img
                       src={slide.photo!.url}
                       alt={slide.photo!.alt}
+                      onError={(e) => {
+                        (e.currentTarget as HTMLElement).style.display = 'none';
+                      }}
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute bottom-1 right-1 bg-black/60 px-1.5 py-0.5 rounded text-[9px] text-slate-300">

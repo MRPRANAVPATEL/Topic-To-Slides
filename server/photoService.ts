@@ -64,6 +64,7 @@ async function searchUnsplashDirect(
         Authorization: `Client-ID ${accessKey}`,
         'Accept-Version': 'v1',
       },
+      signal: AbortSignal.timeout(3500),
     });
 
     if (res.status === 403 || res.status === 429) {

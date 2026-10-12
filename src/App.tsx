@@ -21,6 +21,8 @@ import { ExportProgressModal } from './components/ExportProgressModal';
 import { SuccessBanner } from './components/SuccessBanner';
 import { ErrorAlert } from './components/ErrorAlert';
 import { AuthTab } from './components/AuthTab';
+import { PrivacyPolicy } from './components/PrivacyPolicy';
+import { TermsOfService } from './components/TermsOfService';
 import {
   PresentationOutline,
   SlideItem,
@@ -47,6 +49,43 @@ export default function App() {
   if (isAuthTab) {
     return <AuthTab />;
   }
+
+  // Active page state ('app' | 'privacy' | 'terms')
+  const [currentPage, setCurrentPage] = useState<'app' | 'privacy' | 'terms'>(() => {
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname.toLowerCase();
+      const s = window.location.search.toLowerCase();
+      if (p.includes('/privacy') || s.includes('page=privacy')) return 'privacy';
+      if (p.includes('/terms') || s.includes('page=terms')) return 'terms';
+    }
+    return 'app';
+  });
+
+  // Keep state synced with browser history
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = window.location.pathname.toLowerCase();
+      const s = window.location.search.toLowerCase();
+      if (p.includes('/privacy') || s.includes('page=privacy')) {
+        setCurrentPage('privacy');
+      } else if (p.includes('/terms') || s.includes('page=terms')) {
+        setCurrentPage('terms');
+      } else {
+        setCurrentPage('app');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigateTo = (page: 'app' | 'privacy' | 'terms') => {
+    setCurrentPage(page);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const targetUrl = page === 'app' ? '/' : `/${page}`;
+      window.history.pushState(null, '', targetUrl);
+    }
+  };
 
   // Auth state
   const [user, setUser] = useState<User | null>(null);
@@ -266,6 +305,16 @@ export default function App() {
     setErrorMessage(null);
   };
 
+  // Render Privacy Policy if on /privacy
+  if (currentPage === 'privacy') {
+    return <PrivacyPolicy onBack={() => navigateTo('app')} />;
+  }
+
+  // Render Terms of Service if on /terms
+  if (currentPage === 'terms') {
+    return <TermsOfService onBack={() => navigateTo('app')} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-100/70 text-slate-900 flex flex-col font-sans antialiased selection:bg-amber-100 selection:text-amber-900">
       {/* Top Header */}
@@ -274,6 +323,7 @@ export default function App() {
         onLogin={handleLogin}
         onLogout={handleLogout}
         isLoggingIn={isLoggingIn}
+        onNavigate={navigateTo}
       />
 
       {/* Main Container */}
@@ -418,10 +468,30 @@ export default function App() {
             <span className="hidden sm:inline">•</span>
             <span className="text-slate-600 font-medium">Created by Pranav</span>
           </div>
-          <div className="flex items-center gap-4 text-slate-400">
-            <span>HD Photo Integration</span>
+          <div className="flex items-center gap-3 text-slate-500 font-medium flex-wrap justify-center">
+            <a
+              href="/privacy"
+              onClick={(e) => {
+                e.preventDefault();
+                navigateTo('privacy');
+              }}
+              className="text-slate-600 hover:text-slate-900 hover:underline transition-colors"
+            >
+              Privacy Policy
+            </a>
             <span>•</span>
-            <span>Animated Presentation Mode</span>
+            <a
+              href="/terms"
+              onClick={(e) => {
+                e.preventDefault();
+                navigateTo('terms');
+              }}
+              className="text-slate-600 hover:text-slate-900 hover:underline transition-colors"
+            >
+              Terms of Service
+            </a>
+            <span className="hidden sm:inline">•</span>
+            <span className="text-slate-400 hidden sm:inline">HD Photos & Presenter</span>
           </div>
         </div>
       </footer>

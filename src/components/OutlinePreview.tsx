@@ -213,11 +213,19 @@ export const OutlinePreview: React.FC<OutlinePreviewProps> = ({
         </div>
       </div>
 
-      {/* Rate limit friendly notice */}
+      {/* Rate limit friendly photo notice */}
       {outline.photoNotice && (
         <div className="flex items-center gap-2.5 text-xs text-amber-900 bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 shadow-xs">
           <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
           <span className="font-medium">{outline.photoNotice}</span>
+        </div>
+      )}
+
+      {/* AI rate-limit fallback notice */}
+      {outline.aiNotice && (
+        <div className="flex items-center gap-2.5 text-xs text-blue-900 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 shadow-xs">
+          <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
+          <span className="font-medium">{outline.aiNotice}</span>
         </div>
       )}
 

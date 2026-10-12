@@ -7,6 +7,7 @@ interface HeaderProps {
   onLogin: () => void;
   onLogout: () => void;
   isLoggingIn: boolean;
+  onNavigate?: (page: 'app' | 'privacy' | 'terms') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -14,18 +15,22 @@ export const Header: React.FC<HeaderProps> = ({
   onLogin,
   onLogout,
   isLoggingIn,
+  onNavigate,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Brand */}
-        <div className="flex items-center gap-3">
+        <div
+          className="flex items-center gap-3 cursor-pointer"
+          onClick={() => onNavigate?.('app')}
+        >
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-orange-500 to-yellow-400 flex items-center justify-center shadow-sm text-white">
             <Presentation className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-slate-900 tracking-tight">
+              <h1 className="text-lg font-bold text-slate-900 tracking-tight hover:text-amber-600 transition-colors">
                 Topic to Slides
               </h1>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
@@ -39,8 +44,35 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Auth section */}
-        <div className="flex items-center gap-3">
+        {/* Right Nav & Auth */}
+        <div className="flex items-center gap-2 sm:gap-4">
+          <nav className="hidden md:flex items-center gap-3 text-xs font-semibold text-slate-500">
+            <a
+              href="/privacy"
+              onClick={(e) => {
+                if (onNavigate) {
+                  e.preventDefault();
+                  onNavigate('privacy');
+                }
+              }}
+              className="hover:text-slate-900 transition-colors"
+            >
+              Privacy Policy
+            </a>
+            <span className="text-slate-300">•</span>
+            <a
+              href="/terms"
+              onClick={(e) => {
+                if (onNavigate) {
+                  e.preventDefault();
+                  onNavigate('terms');
+                }
+              }}
+              className="hover:text-slate-900 transition-colors"
+            >
+              Terms of Service
+            </a>
+          </nav>
           {user ? (
             <div className="flex items-center gap-3 bg-slate-50 border border-slate-200/70 rounded-full py-1 px-3">
               {user.photoURL ? (

@@ -71,8 +71,8 @@ export const initAuth = (
         }
       }
     })
-    .catch((err) => {
-      console.warn('Direct redirect check notice:', err);
+    .catch(() => {
+      // Normal when not returning from a redirect flow
     });
 
   // Standard Firebase Auth state listener

@@ -49,6 +49,7 @@ export interface PresentationOutline {
   buildBulletsAcrossSlides: boolean;
   slides: SlideItem[];
   photoNotice?: string;
+  aiNotice?: string;
 }
 
 export interface ExportResult {
