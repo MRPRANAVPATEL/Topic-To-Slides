@@ -1,0 +1,6 @@
+{
+  "name": "Topic to Slides",
+  "description": "Generate structured slide deck outlines with Gemini and export directly to Google Slides.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
