@@ -20,6 +20,7 @@ import { ExportConfirmModal } from './components/ExportConfirmModal';
 import { ExportProgressModal } from './components/ExportProgressModal';
 import { SuccessBanner } from './components/SuccessBanner';
 import { ErrorAlert } from './components/ErrorAlert';
+import { AuthTab } from './components/AuthTab';
 import {
   PresentationOutline,
   SlideItem,
@@ -38,6 +39,15 @@ import {
 } from 'lucide-react';
 
 export default function App() {
+  // If this window is the dedicated OAuth authentication tab, render AuthTab
+  const isAuthTab =
+    typeof window !== 'undefined' &&
+    window.location.search.includes('auth_flow=1');
+
+  if (isAuthTab) {
+    return <AuthTab />;
+  }
+
   // Auth state
   const [user, setUser] = useState<User | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -94,9 +104,14 @@ export default function App() {
       }
     } catch (err: any) {
       console.error('Login failed:', err);
-      if (err?.code !== 'auth/popup-closed-by-user') {
+      if (
+        err?.message?.includes('closed before completing') ||
+        err?.message?.includes('cancelled')
+      ) {
+        // User closed the tab or cancelled
+      } else {
         setErrorMessage(
-          'Failed to sign in with Google. Please check your browser popup settings and try again.'
+          err?.message || 'Failed to sign in with Google. Please try again.'
         );
       }
     } finally {
@@ -396,10 +411,12 @@ export default function App() {
       {/* Footer */}
       <footer className="border-t border-slate-200 bg-white/50 py-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start">
             <Presentation className="w-4 h-4 text-amber-600" />
             <span className="font-semibold text-slate-700">Topic to Slides</span>
-            <span>• Powered by Gemini & Google Slides API</span>
+            <span>• Built using the Gemini API and Google Slides API</span>
+            <span className="hidden sm:inline">•</span>
+            <span className="text-slate-600 font-medium">Created by Pranav</span>
           </div>
           <div className="flex items-center gap-4 text-slate-400">
             <span>HD Photo Integration</span>
