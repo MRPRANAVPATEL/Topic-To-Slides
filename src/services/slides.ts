@@ -548,7 +548,7 @@ export async function createGoogleSlidesPresentation(
   }
 
   // Execute batchUpdate for slides structure
-  const batchResponse = await fetch(
+  let batchResponse = await fetch(
     `https://slides.googleapis.com/v1/presentations/${presentationId}:batchUpdate`,
     {
       method: 'POST',
@@ -562,10 +562,36 @@ export async function createGoogleSlidesPresentation(
 
   if (!batchResponse.ok) {
     const errorData = await batchResponse.json().catch(() => ({}));
-    throw new Error(
-      errorData.error?.message ||
-        `Failed to populate presentation slides (${batchResponse.status})`
-    );
+    const errText = errorData.error?.message || '';
+
+    // If Google Slides rejected an external image URL, filter out the image requests and retry
+    if (errText.toLowerCase().includes('image') || errText.toLowerCase().includes('retrieving')) {
+      console.warn('Image fetch failed on Google Slides server. Retrying with styled vector backgrounds:', errText);
+      const safeRequests = requests.filter(
+        (r) => !r.updatePageProperties?.pageProperties?.pageBackgroundFill?.stretchedPictureFill && !r.createImage
+      );
+
+      batchResponse = await fetch(
+        `https://slides.googleapis.com/v1/presentations/${presentationId}:batchUpdate`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ requests: safeRequests }),
+        }
+      );
+    }
+
+    if (!batchResponse.ok) {
+      const fallbackErr = await batchResponse.json().catch(() => ({}));
+      throw new Error(
+        fallbackErr.error?.message ||
+          errorData.error?.message ||
+          `Failed to populate presentation slides (${batchResponse.status})`
+      );
+    }
   }
 
   onProgress?.('Attaching presenter speaker notes...');

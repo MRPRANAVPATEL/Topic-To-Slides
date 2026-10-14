@@ -38,27 +38,48 @@ const CURATED_TOPIC_PHOTOS: Record<string, string[]> = {
     'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1280&q=80',
     'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1280&q=80',
     'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1280&q=80',
   ],
   business: [
     'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1280&q=80',
     'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1280&q=80',
     'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=1280&q=80',
     'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=1280&q=80',
+  ],
+  education: [
+    'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=1280&q=80',
   ],
   science: [
     'https://images.unsplash.com/photo-1507413245164-6160d8298b31?auto=format&fit=crop&w=1280&q=80',
     'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=1280&q=80',
     'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1507668077129-56e32842fceb?auto=format&fit=crop&w=1280&q=80',
   ],
   nature: [
     'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=1280&q=80',
     'https://images.unsplash.com/photo-1426604966848-d7adac402bff?auto=format&fit=crop&w=1280&q=80',
     'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1280&q=80',
+  ],
+  health: [
+    'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?auto=format&fit=crop&w=1280&q=80',
+  ],
+  finance: [
+    'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=1280&q=80',
   ],
   creative: [
     'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=1280&q=80',
     'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=1280&q=80',
     'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=1280&q=80',
   ],
 };
 
@@ -68,7 +89,7 @@ function getCuratedPhoto(category: string, index: number): PhotoItem {
   return {
     url,
     thumbUrl: url,
-    photographer: 'Unsplash Community',
+    photographer: 'Unsplash Photography',
     photographerUrl: 'https://unsplash.com',
     source: 'Stock',
     alt: `${category} presentation photograph`,
@@ -250,26 +271,42 @@ export async function searchPhotoForSlide(
   const aiPhoto2 = buildAiGeneratedPhoto(cleanQuery, topic, slideIndex + 99);
   candidates.push(aiPhoto1, aiPhoto2);
 
-  // 4. Also add a curated high-res topic photo candidate
+  // 4. Select curated high-res topic photo
   const lowerTopic = (topic + ' ' + cleanQuery).toLowerCase();
   let category = 'tech';
-  if (lowerTopic.includes('business') || lowerTopic.includes('market') || lowerTopic.includes('money') || lowerTopic.includes('manage')) {
+  if (lowerTopic.includes('business') || lowerTopic.includes('market') || lowerTopic.includes('money') || lowerTopic.includes('manage') || lowerTopic.includes('work') || lowerTopic.includes('startup')) {
     category = 'business';
-  } else if (lowerTopic.includes('bio') || lowerTopic.includes('science') || lowerTopic.includes('space') || lowerTopic.includes('physic')) {
+  } else if (lowerTopic.includes('school') || lowerTopic.includes('student') || lowerTopic.includes('learn') || lowerTopic.includes('teach') || lowerTopic.includes('educat') || lowerTopic.includes('book')) {
+    category = 'education';
+  } else if (lowerTopic.includes('health') || lowerTopic.includes('med') || lowerTopic.includes('doctor') || lowerTopic.includes('fit') || lowerTopic.includes('hospital')) {
+    category = 'health';
+  } else if (lowerTopic.includes('finance') || lowerTopic.includes('bank') || lowerTopic.includes('crypto') || lowerTopic.includes('invest') || lowerTopic.includes('economy')) {
+    category = 'finance';
+  } else if (lowerTopic.includes('bio') || lowerTopic.includes('science') || lowerTopic.includes('space') || lowerTopic.includes('physic') || lowerTopic.includes('chem')) {
     category = 'science';
-  } else if (lowerTopic.includes('nature') || lowerTopic.includes('environment') || lowerTopic.includes('climate') || lowerTopic.includes('earth')) {
+  } else if (lowerTopic.includes('nature') || lowerTopic.includes('environment') || lowerTopic.includes('climate') || lowerTopic.includes('earth') || lowerTopic.includes('ocean') || lowerTopic.includes('plant')) {
     category = 'nature';
-  } else if (lowerTopic.includes('art') || lowerTopic.includes('design') || lowerTopic.includes('creative')) {
+  } else if (lowerTopic.includes('art') || lowerTopic.includes('design') || lowerTopic.includes('creative') || lowerTopic.includes('music')) {
     category = 'creative';
   }
-  candidates.push(getCuratedPhoto(category, slideIndex));
+  const curatedPhoto = getCuratedPhoto(category, slideIndex);
 
-  // The primary photo will be the top candidate (Unsplash if available, or Wikimedia/AI)
-  const primaryPhoto = candidates[0] || aiPhoto1;
+  // If Unsplash API returned results, place them first; otherwise use the curated Unsplash photo as primary
+  // so Google Slides API and browsers load the images instantly without network delays or timeouts.
+  const primaryPhoto = candidates[0] || curatedPhoto;
+  
+  // Ensure both curated and AI photos are in candidates for the user to pick or swap anytime
+  const allCandidates = [
+    primaryPhoto,
+    ...(primaryPhoto.url !== curatedPhoto.url ? [curatedPhoto] : []),
+    aiPhoto1,
+    aiPhoto2,
+    ...candidates.filter(c => c.url !== primaryPhoto.url && c.url !== curatedPhoto.url),
+  ];
 
   return {
     photo: primaryPhoto,
-    candidates,
+    candidates: allCandidates,
     rateLimited: isRateLimited(),
   };
 }

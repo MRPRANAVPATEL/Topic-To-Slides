@@ -147,11 +147,15 @@ export default function App() {
         err?.message?.includes('closed before completing') ||
         err?.message?.includes('cancelled')
       ) {
-        // User closed the tab or cancelled
+        setErrorMessage(
+          'Sign-in was not completed or the window was closed. If Google displayed "Access blocked" or "Request details", your account must be added to Test Users in Google Cloud Console, and topic-to-slides.vercel.app must be added to Authorized Domains in Firebase.'
+        );
+        setIsAuthError(true);
       } else {
         setErrorMessage(
           err?.message || 'Failed to sign in with Google. Please try again.'
         );
+        setIsAuthError(true);
       }
     } finally {
       setIsLoggingIn(false);

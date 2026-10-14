@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getAuth,
+  signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
   GoogleAuthProvider,
@@ -21,8 +22,14 @@ provider.setCustomParameters({ prompt: 'select_account' });
 
 // Flag to indicate if we are in the middle of a sign-in flow
 let isSigningIn = false;
-// In-memory cache for access token (never stored in localStorage or sessionStorage)
+// In-memory cache for access token with session fallback
 let cachedAccessToken: string | null = null;
+
+if (typeof window !== 'undefined') {
+  try {
+    cachedAccessToken = sessionStorage.getItem('topic_slides_access_token');
+  } catch (_) {}
+}
 
 // Initialize auth state listener and cross-tab sync.
 export const initAuth = (
@@ -187,21 +194,73 @@ export const openGoogleSignInTab = async (): Promise<{ user: User; accessToken: 
   });
 };
 
-export const googleSignIn = async (): Promise<{ user: User; accessToken: string }> => {
-  return openGoogleSignInTab();
+export const setCachedAccessToken = (token: string | null) => {
+  cachedAccessToken = token;
+  if (typeof window !== 'undefined') {
+    try {
+      if (token) {
+        sessionStorage.setItem('topic_slides_access_token', token);
+      } else {
+        sessionStorage.removeItem('topic_slides_access_token');
+      }
+    } catch (_) {}
+  }
 };
 
 export const getAccessToken = (): string | null => {
-  return cachedAccessToken;
+  if (cachedAccessToken) return cachedAccessToken;
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = sessionStorage.getItem('topic_slides_access_token');
+      if (stored) {
+        cachedAccessToken = stored;
+        return stored;
+      }
+    } catch (_) {}
+  }
+  return null;
 };
 
-export const setCachedAccessToken = (token: string | null) => {
-  cachedAccessToken = token;
+export const googleSignIn = async (): Promise<{ user: User; accessToken: string }> => {
+  // If not inside an iframe (e.g. top-level on Vercel or localhost), try signInWithPopup directly
+  const isTopWindow = typeof window !== 'undefined' && window.top === window.self;
+
+  if (isTopWindow) {
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const accessToken = credential?.accessToken || null;
+
+      if (!accessToken) {
+        throw new Error('Google did not return an access token for Slides permissions.');
+      }
+
+      setCachedAccessToken(accessToken);
+      return { user: result.user, accessToken };
+    } catch (popupErr: any) {
+      console.warn('Direct popup auth encounter:', popupErr);
+      // If user deliberately cancelled/closed popup, don't fallback to tab
+      if (
+        popupErr?.code === 'auth/popup-closed-by-user' ||
+        popupErr?.code === 'auth/cancelled-popup-request'
+      ) {
+        throw new Error('Sign-in was cancelled.');
+      }
+      // If popup was blocked or unauthorized domain, try openGoogleSignInTab fallback
+      if (popupErr?.code === 'auth/popup-blocked') {
+        return openGoogleSignInTab();
+      }
+      throw popupErr;
+    }
+  }
+
+  // Inside iframe or constrained environment: use dedicated tab
+  return openGoogleSignInTab();
 };
 
 export const logout = async () => {
   await signOut(auth);
-  cachedAccessToken = null;
+  setCachedAccessToken(null);
 
   if (typeof BroadcastChannel !== 'undefined') {
     try {
@@ -212,4 +271,11 @@ export const logout = async () => {
   }
 };
 
-export { auth, provider, signInWithRedirect, getRedirectResult, GoogleAuthProvider };
+export {
+  auth,
+  provider,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  GoogleAuthProvider,
+};
