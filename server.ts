@@ -24,19 +24,16 @@ app.get('/api/config-status', (_req: Request, res: Response) => {
 // Endpoint to swap photo or search photos for a query
 app.post('/api/search-photos', async (req: Request, res: Response) => {
   try {
-    const { query, topic = '' } = req.body;
+    const { query, topic = '', slideIndex = 1 } = req.body;
     if (!query || typeof query !== 'string') {
       return res.status(400).json({ error: 'Valid search query required.' });
     }
 
-    const result = await searchPhotoForSlide(query, topic);
+    const result = await searchPhotoForSlide(query, topic, Number(slideIndex) || 1);
     return res.json({
       primary: result.photo,
       candidates: result.candidates,
       rateLimited: result.rateLimited,
-      notice: result.rateLimited
-        ? 'Photo limit reached, using colors for the rest. Try again in an hour.'
-        : undefined,
     });
   } catch (error: any) {
     console.error('Photo search error:', error);

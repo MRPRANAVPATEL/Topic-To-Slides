@@ -519,11 +519,16 @@ export const SlideCard: React.FC<SlideCardProps> = ({
           <div className="flex items-center gap-2 truncate max-w-sm">
             {hasPhoto && slide.photo ? (
               <span className="truncate">
-                Photo by{' '}
-                <strong className="text-slate-300">
-                  {slide.photo.photographer}
-                </strong>{' '}
-                on Unsplash
+                {slide.photo.source === 'AI' ? (
+                  <>
+                    Visual: <strong className="text-slate-300">AI Generated</strong>
+                  </>
+                ) : (
+                  <>
+                    Photo by <strong className="text-slate-300">{slide.photo.photographer}</strong>
+                    {slide.photo.source === 'Unsplash' ? ' on Unsplash' : ` (${slide.photo.source})`}
+                  </>
+                )}
               </span>
             ) : (
               <span>Topic to Slides</span>

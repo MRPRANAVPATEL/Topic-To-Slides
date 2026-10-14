@@ -12,7 +12,7 @@ export interface SlidePhoto {
   thumbUrl: string;
   photographer: string;
   photographerUrl?: string;
-  source: 'Unsplash' | 'Gradient';
+  source: 'Unsplash' | 'Gradient' | 'AI' | 'Wikimedia' | 'Stock' | string;
   alt: string;
 }
 

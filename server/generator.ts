@@ -82,11 +82,17 @@ Structure & Layout Requirements:
   let aiNotice: string | undefined = undefined;
 
   // Primary model and fallback models with separate quota pools
-  const candidateModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  // Note: gemini-3.1-flash-lite is the fastest and has independent quota capacity
+  const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
 
   for (const modelName of candidateModels) {
     try {
-      const response = await ai.models.generateContent({
+      console.log(`Generating presentation outline with model: ${modelName}`);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`Timeout generating with ${modelName}`)), 12000)
+      );
+
+      const generatePromise = ai.models.generateContent({
         model: modelName,
         contents: prompt,
         config: {
@@ -174,6 +180,8 @@ Structure & Layout Requirements:
           },
         },
       });
+
+      const response: any = await Promise.race([generatePromise, timeoutPromise]);
 
       if (response?.text) {
         outlineData = JSON.parse(response.text);
@@ -344,31 +352,26 @@ Structure & Layout Requirements:
     )
   );
 
+  // Step 2: High-resolution photo generation per slide with candidates
   // Fetch distinct queries in parallel for high speed and minimal latency
-  if (!rateLimitReached) {
-    const searchResults = await Promise.all(
-      distinctQueries.map(async (cleanQuery) => {
-        try {
-          const result = await searchPhotoForSlide(cleanQuery, trimmedTopic);
-          return { cleanQuery, result };
-        } catch {
-          return {
-            cleanQuery,
-            result: { photo: null, candidates: [], rateLimited: false },
-          };
-        }
-      })
-    );
-
-    for (const { cleanQuery, result } of searchResults) {
-      if (result.rateLimited) {
-        rateLimitReached = true;
+  const searchResults = await Promise.all(
+    distinctQueries.map(async (cleanQuery, qIdx) => {
+      try {
+        const result = await searchPhotoForSlide(cleanQuery, trimmedTopic, qIdx + 1);
+        return { cleanQuery, result };
+      } catch (err) {
+        console.warn('Photo fetch fallback:', err);
+        const result = await searchPhotoForSlide(cleanQuery, trimmedTopic, qIdx + 1);
+        return { cleanQuery, result };
       }
-      queryToPhotoMap.set(cleanQuery, {
-        photo: result.photo,
-        candidates: result.candidates,
-      });
-    }
+    })
+  );
+
+  for (const { cleanQuery, result } of searchResults) {
+    queryToPhotoMap.set(cleanQuery, {
+      photo: result.photo,
+      candidates: result.candidates,
+    });
   }
 
   // Identify title photo to reuse for closing slide
@@ -377,42 +380,36 @@ Structure & Layout Requirements:
   const titleSlidePhoto: PhotoItem | null = titleMatch?.photo || null;
   const titleSlideCandidates: PhotoItem[] = titleMatch?.candidates || [];
 
-  const slidesWithPhotos = rawSlides.map((slide: any, idx: number) => {
-    const isClosingSlide = idx === rawSlides.length - 1 || slide.slideType === 'closing';
+  const slidesWithPhotos = await Promise.all(
+    rawSlides.map(async (slide: any, idx: number) => {
+      const isClosingSlide = idx === rawSlides.length - 1 || slide.slideType === 'closing';
 
-    // Rule: Reuse title slide photo for the closing slide
-    if (isClosingSlide && titleSlidePhoto) {
+      // Rule: Reuse title slide photo for the closing slide if present
+      if (isClosingSlide && titleSlidePhoto) {
+        return {
+          ...slide,
+          photo: titleSlidePhoto,
+          candidatePhotos: titleSlideCandidates,
+          hasImage: true,
+        };
+      }
+
+      const cleanQuery = slide.imageQuery.trim().toLowerCase();
+      let match = queryToPhotoMap.get(cleanQuery);
+
+      if (!match || !match.photo) {
+        const fallbackResult = await searchPhotoForSlide(slide.imageQuery, trimmedTopic, idx + 1);
+        match = { photo: fallbackResult.photo, candidates: fallbackResult.candidates };
+      }
+
       return {
         ...slide,
-        photo: titleSlidePhoto,
-        candidatePhotos: titleSlideCandidates,
+        photo: match.photo,
+        candidatePhotos: match.candidates || [match.photo],
         hasImage: true,
       };
-    }
-
-    if (rateLimitReached) {
-      return {
-        ...slide,
-        photo: null,
-        candidatePhotos: [],
-        hasImage: false,
-      };
-    }
-
-    const cleanQuery = slide.imageQuery.trim().toLowerCase();
-    const match = queryToPhotoMap.get(cleanQuery);
-
-    return {
-      ...slide,
-      photo: match?.photo || null,
-      candidatePhotos: match?.candidates || [],
-      hasImage: !!match?.photo,
-    };
-  });
-
-  const photoNotice = rateLimitReached
-    ? 'Photo limit reached, using colors for the rest. Try again in an hour.'
-    : undefined;
+    })
+  );
 
   return {
     topic: trimmedTopic,
@@ -422,7 +419,7 @@ Structure & Layout Requirements:
     layoutMode: layoutMode || 'background-overlay',
     buildBulletsAcrossSlides: false,
     slides: slidesWithPhotos,
-    photoNotice,
+    photoNotice: undefined,
     aiNotice,
   };
 }

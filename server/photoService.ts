@@ -3,14 +3,14 @@ export interface PhotoItem {
   thumbUrl: string;
   photographer: string;
   photographerUrl?: string;
-  source: 'Unsplash' | 'Gradient';
+  source: 'Unsplash' | 'Gradient' | 'AI' | 'Wikimedia' | 'Stock';
   alt: string;
 }
 
-// In-memory cache to save Unsplash demo quota (50 requests/hour)
+// In-memory cache to save API calls
 const queryCache = new Map<string, PhotoItem[]>();
 
-// Rate-limit tracking: if HTTP 403 or 429 is received, stop requests
+// Rate-limit tracking for Unsplash
 let rateLimitHitTimestamp = 0;
 const RATE_LIMIT_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour cooldown
 
@@ -20,19 +20,137 @@ export function isRateLimited(): boolean {
   if (elapsed < RATE_LIMIT_COOLDOWN_MS) {
     return true;
   }
-  // Cooldown passed, reset flag
   rateLimitHitTimestamp = 0;
   return false;
 }
 
 export function markRateLimited() {
   rateLimitHitTimestamp = Date.now();
-  console.warn('Unsplash rate limit hit (403/429). Switching to colorful gradients.');
+  console.warn('Unsplash rate limit hit (403/429). Switching to AI and open image providers.');
 }
 
 /**
- * Searches Unsplash for landscape photos.
- * Returns photo candidates, or null if no results / rate limited / failed.
+ * Curated high-resolution open CDN photos for instant, rock-solid fallback.
+ */
+const CURATED_TOPIC_PHOTOS: Record<string, string[]> = {
+  tech: [
+    'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1280&q=80',
+  ],
+  business: [
+    'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1280&q=80',
+  ],
+  science: [
+    'https://images.unsplash.com/photo-1507413245164-6160d8298b31?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1280&q=80',
+  ],
+  nature: [
+    'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1426604966848-d7adac402bff?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1280&q=80',
+  ],
+  creative: [
+    'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=1280&q=80',
+    'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?auto=format&fit=crop&w=1280&q=80',
+  ],
+};
+
+function getCuratedPhoto(category: string, index: number): PhotoItem {
+  const cat = CURATED_TOPIC_PHOTOS[category] || CURATED_TOPIC_PHOTOS.tech;
+  const url = cat[Math.abs(index) % cat.length];
+  return {
+    url,
+    thumbUrl: url,
+    photographer: 'Unsplash Community',
+    photographerUrl: 'https://unsplash.com',
+    source: 'Stock',
+    alt: `${category} presentation photograph`,
+  };
+}
+
+/**
+ * Generates a prompt-tailored, cinematic 16:9 presentation image via Pollinations AI.
+ */
+function buildAiGeneratedPhoto(query: string, topic: string, seedOffset = 1): PhotoItem {
+  const cleanTopic = topic.replace(/[^\w\s-]/g, '').trim();
+  const cleanQuery = query.replace(/[^\w\s-]/g, '').trim();
+  const prompt = `${cleanTopic} ${cleanQuery} cinematic presentation slide background professional 4k high definition`;
+  
+  // Deterministic seed so the image stays stable across re-renders
+  let hash = 0;
+  const str = `${cleanTopic}_${cleanQuery}_${seedOffset}`;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  const seed = (Math.abs(hash) % 89999) + 10001;
+
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
+    prompt
+  )}?width=1280&height=720&nologo=true&seed=${seed}`;
+
+  return {
+    url,
+    thumbUrl: url,
+    photographer: 'AI Presentation Artist',
+    photographerUrl: 'https://pollinations.ai',
+    source: 'AI',
+    alt: `${cleanQuery} AI visual`,
+  };
+}
+
+/**
+ * Searches Wikimedia Commons / Wikipedia for authentic real-world photography.
+ */
+async function searchWikimediaDirect(query: string): Promise<PhotoItem[]> {
+  try {
+    const cleanQuery = query.trim().replace(/[^\w\s-]/g, '');
+    const url = `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
+      cleanQuery
+    )}&gsrlimit=4&prop=pageimages|info&pithumbsize=1280&format=json&origin=*`;
+
+    const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    if (!data?.query?.pages) return [];
+
+    const photos: PhotoItem[] = [];
+    for (const page of Object.values<any>(data.query.pages)) {
+      const src = page.thumbnail?.source;
+      if (
+        src &&
+        typeof src === 'string' &&
+        !src.endsWith('.svg.png') &&
+        !src.endsWith('.svg') &&
+        !src.includes('flag') &&
+        !src.includes('icon')
+      ) {
+        photos.push({
+          url: src,
+          thumbUrl: src,
+          photographer: 'Wikimedia Commons Contributor',
+          photographerUrl: `https://en.wikipedia.org/?curid=${page.pageid}`,
+          source: 'Wikimedia',
+          alt: page.title || query,
+        });
+      }
+    }
+    return photos;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Searches Unsplash for landscape photos if access key is available.
  */
 async function searchUnsplashDirect(
   query: string
@@ -57,7 +175,7 @@ async function searchUnsplashDirect(
   try {
     const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(
       cleanQuery
-    )}&orientation=landscape&per_page=6&content_filter=high`;
+    )}&orientation=landscape&per_page=5&content_filter=high`;
 
     const res = await fetch(url, {
       headers: {
@@ -73,7 +191,6 @@ async function searchUnsplashDirect(
     }
 
     if (!res.ok) {
-      console.warn(`Unsplash request returned status ${res.status}: ${res.statusText}`);
       return null;
     }
 
@@ -83,7 +200,7 @@ async function searchUnsplashDirect(
     }
 
     const photos: PhotoItem[] = data.results.map((photo: any) => ({
-      url: photo.urls.regular, // High-quality 1080p / 1600px wide landscape JPEG
+      url: photo.urls.regular,
       thumbUrl: photo.urls.small,
       photographer: photo.user?.name || 'Unsplash Contributor',
       photographerUrl: photo.user?.links?.html || 'https://unsplash.com',
@@ -93,79 +210,66 @@ async function searchUnsplashDirect(
 
     queryCache.set(cleanQuery, photos);
     return { photos, rateLimited: false };
-  } catch (err) {
-    console.warn('Unsplash search network failure:', err);
+  } catch {
     return null;
   }
 }
 
 /**
- * Extracts a broad, single root keyword from the topic to use as a fallback search.
- */
-function extractBroaderTopicWord(topic: string): string {
-  const words = topic
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter(
-      (w) =>
-        w.length > 3 &&
-        !['introduction', 'overview', 'advanced', 'simple', 'student', 'guide', 'basics', 'future', 'topic'].includes(
-          w
-        )
-    );
-
-  return words[0] || 'nature';
-}
-
-/**
  * Main search function for a single slide:
- * 1. Unsplash search using the slide's imageQuery.
- * 2. If nothing returned, retry once with a broader one-word query based on deck topic.
- * 3. If that also fails or rate-limit hit, return null (gradient background will be used).
+ * 1. Checks Unsplash (if key present and valid).
+ * 2. Checks Wikimedia Commons for authentic topic images.
+ * 3. Generates high-resolution tailored AI presentation visuals.
+ * 4. Merges candidates so user can swap anytime.
+ * Guaranteed to NEVER return null for photo - slides will always have rich imagery.
  */
 export async function searchPhotoForSlide(
   imageQuery: string,
-  topic: string
-): Promise<{ photo: PhotoItem | null; candidates: PhotoItem[]; rateLimited: boolean }> {
-  // 1. Primary search with slide's imageQuery
-  const primaryResult = await searchUnsplashDirect(imageQuery);
+  topic: string,
+  slideIndex = 1
+): Promise<{ photo: PhotoItem; candidates: PhotoItem[]; rateLimited: boolean }> {
+  const candidates: PhotoItem[] = [];
+  const cleanQuery = imageQuery.trim();
 
-  if (primaryResult?.rateLimited) {
-    return { photo: null, candidates: [], rateLimited: true };
+  // 1. Try Unsplash if configured
+  const unsplashResult = await searchUnsplashDirect(cleanQuery);
+  if (unsplashResult && unsplashResult.photos.length > 0) {
+    candidates.push(...unsplashResult.photos);
   }
 
-  if (primaryResult && primaryResult.photos.length > 0) {
-    return {
-      photo: primaryResult.photos[0],
-      candidates: primaryResult.photos,
-      rateLimited: false,
-    };
-  }
-
-  // 2. Retry once with a broader one-word query based on deck topic
-  const broadWord = extractBroaderTopicWord(topic);
-  if (broadWord && broadWord.toLowerCase() !== imageQuery.toLowerCase()) {
-    console.log(`Unsplash returned no photos for "${imageQuery}". Retrying once with broader keyword: "${broadWord}"`);
-    const retryResult = await searchUnsplashDirect(broadWord);
-
-    if (retryResult?.rateLimited) {
-      return { photo: null, candidates: [], rateLimited: true };
-    }
-
-    if (retryResult && retryResult.photos.length > 0) {
-      return {
-        photo: retryResult.photos[0],
-        candidates: retryResult.photos,
-        rateLimited: false,
-      };
+  // 2. Fetch authentic Wikimedia Commons photos in parallel/fallback
+  if (candidates.length < 3) {
+    const wikiPhotos = await searchWikimediaDirect(cleanQuery);
+    if (wikiPhotos.length > 0) {
+      candidates.push(...wikiPhotos);
     }
   }
 
-  // 3. If both fail, return null so gradient background is used
+  // 3. Generate high-quality AI presentation visual tailored specifically to the slide query
+  const aiPhoto1 = buildAiGeneratedPhoto(cleanQuery, topic, slideIndex);
+  const aiPhoto2 = buildAiGeneratedPhoto(cleanQuery, topic, slideIndex + 99);
+  candidates.push(aiPhoto1, aiPhoto2);
+
+  // 4. Also add a curated high-res topic photo candidate
+  const lowerTopic = (topic + ' ' + cleanQuery).toLowerCase();
+  let category = 'tech';
+  if (lowerTopic.includes('business') || lowerTopic.includes('market') || lowerTopic.includes('money') || lowerTopic.includes('manage')) {
+    category = 'business';
+  } else if (lowerTopic.includes('bio') || lowerTopic.includes('science') || lowerTopic.includes('space') || lowerTopic.includes('physic')) {
+    category = 'science';
+  } else if (lowerTopic.includes('nature') || lowerTopic.includes('environment') || lowerTopic.includes('climate') || lowerTopic.includes('earth')) {
+    category = 'nature';
+  } else if (lowerTopic.includes('art') || lowerTopic.includes('design') || lowerTopic.includes('creative')) {
+    category = 'creative';
+  }
+  candidates.push(getCuratedPhoto(category, slideIndex));
+
+  // The primary photo will be the top candidate (Unsplash if available, or Wikimedia/AI)
+  const primaryPhoto = candidates[0] || aiPhoto1;
+
   return {
-    photo: null,
-    candidates: [],
+    photo: primaryPhoto,
+    candidates,
     rateLimited: isRateLimited(),
   };
 }

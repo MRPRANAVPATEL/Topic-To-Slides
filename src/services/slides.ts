@@ -476,11 +476,17 @@ export async function createGoogleSlidesPresentation(
       });
     }
 
-    // 7. Photographer Credit & Footer (Required by Unsplash terms)
+    // 7. Image Credit & Footer
     const footerId = `footer_${uIdx}`;
     let creditText = `Topic to Slides • ${outline.topic}`;
     if (hasPhoto && slide.photo) {
-      creditText += `  |  Photo by ${slide.photo.photographer} on Unsplash`;
+      if (slide.photo.source === 'Unsplash') {
+        creditText += `  |  Photo by ${slide.photo.photographer} on Unsplash`;
+      } else if (slide.photo.source === 'AI') {
+        creditText += `  |  Visual by AI Generation`;
+      } else {
+        creditText += `  |  Image: ${slide.photo.photographer} (${slide.photo.source})`;
+      }
     }
 
     requests.push(
